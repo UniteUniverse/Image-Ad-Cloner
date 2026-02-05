@@ -1,0 +1,353 @@
+{
+  "name": "Image Ad Cloner AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Facebook Ad Thief Form",
+        "formDescription": "Upload your product image and submit a competitor image url for the ads you want to clone/spin for your product",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Competitor Image Link",
+              "placeholder": "https://www.facebook.com/",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Your Product Image",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Additional changes"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -800,
+        -432
+      ],
+      "id": "cde8e8f1-fa9a-4d9a-b090-1e58d2f7c8fd",
+      "name": "form_trigger",
+      "webhookId": "739f6e4b-c69f-4baf-b6fe-f671f8ba6279"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('form_trigger').item.json['Competitor Image Link'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -352,
+        -432
+      ],
+      "id": "e358408a-4da1-4f75-9e49-b72935f38f9d",
+      "name": "download_image"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -208
+      ],
+      "id": "af21823c-f491-442d-844e-36ef435f2709",
+      "name": "convert_ad_image_to_base64"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "image_result",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -240
+      ],
+      "id": "9946c255-5b00-4d02-a1b2-0ea702a7186b",
+      "name": "get_image"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "524da01b-f8b9-4c2c-9e28-319455903e4d",
+              "name": "=image_result",
+              "value": "={{ $json.candidates[0].content.parts.filter(item => item.inlineData).first().inlineData.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -320,
+        16
+      ],
+      "id": "600e07e0-9e55-48c2-9e37-f63c1775e785",
+      "name": "set_result"
+    },
+    {
+      "parameters": {
+        "operation": "binaryToPropery",
+        "binaryPropertyName": "Your_Product_Image",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -432
+      ],
+      "id": "cbf6d842-4292-4e33-8d6b-f17327f8ae44",
+      "name": "convert_product_image_to_base64"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [\n      { \"text\": {{ JSON.stringify($json.prompt) }} },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"image/png\",\n          \"data\": \"{{ $node['convert_product_image_to_base64'].json.data }}\"\n        }\n      },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"image/jpeg\",\n          \"data\": \"{{ $node['convert_ad_image_to_base64'].json.data }}\"\n        }\n      }\n    ]\n  }]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -320,
+        -208
+      ],
+      "id": "d18e9368-edf1-40b2-92fb-109ca6893b40",
+      "name": "generate_ad_image_prompt",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VBnXim8Eh0tKnSvl",
+          "name": "Header Auth account 2"
+        },
+        "httpBearerAuth": {
+          "id": "3EULvRek47J5GTvc",
+          "name": "Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [\n      { \"text\": {{ JSON.stringify($json.candidates.first().content.parts.first().text) }} },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"image/png\",\n          \"data\": \"{{ $node['convert_product_image_to_base64'].json.data }}\"\n        }\n      },\n      {\n        \"inline_data\": {\n          \"mime_type\": \"image/jpeg\",\n          \"data\": \"{{ $node['convert_ad_image_to_base64'].json.data }}\"\n        }\n      }\n    ]\n  }]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -768,
+        16
+      ],
+      "id": "c99b2abb-e1f9-4133-9d8b-0ce22a8ce310",
+      "name": "generate_ad_image",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "VBnXim8Eh0tKnSvl",
+          "name": "Header Auth account 2"
+        },
+        "httpBearerAuth": {
+          "id": "3EULvRek47J5GTvc",
+          "name": "Gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2fcf84d7-4a17-4899-9bea-a7d3b6027acd",
+              "name": "prompt",
+              "value": "=You are an expert in image I need your help to write a perfect prompt that is going to help me generate/edit an image for my company's product. Attached to this request are two images: 1. Product picture  (our product) 2. Reference image of the competitor's ad we're trying to replicate In your analysis of these images, I want you to come up with a plan and write a very detailed prompt on how we can clone and spin the ad from image number two (our competitor) to make an identical ad that features our product with our packaging  and image number one. We need to replicate the same style used on the  competitor ad, but it should always be our packaging that's included. Some tricky edge cases you need to handle are: Partial branding items of the text (there can be text that says , labels on products that say , multiple products, multiple packages that are different from ours). Please check for all placements in the  ad that need to be replaced. You need to figure out how to write a specific prompt that is going to detail this image generator how to replace it and create the ad for our product. The end result we're going for is a new ad that promotes our product . Make sure your prompt includes changes that need to be changed on the text of the image like labels and calls to action. It's possible that the source ad image for our competitor  will have partial text on the product or packaging like \"A\", \"AG\", \"G, \"G\" (standalone), \"G1\", or some other partial text that needs to be checked for and analyzed in your plan. Keep the ad copy the same EXCEPT for switching competitor brand name to our name to Think deeply about the prompt you are going to write. Also consider any additional changes requested   such as {{ $('form_trigger').item.json['Additional changes'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        -208
+      ],
+      "id": "63bc2fec-26c3-47cc-86df-026f831b9fda",
+      "name": "build_prompt"
+    },
+    {
+      "parameters": {
+        "content": "# Image Ad Cloner AI Agent",
+        "height": 768,
+        "width": 1232,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -992,
+        -544
+      ],
+      "typeVersion": 1,
+      "id": "c6a71cd4-b74f-4ef2-a098-c82907594c8c",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -544,
+        16
+      ],
+      "id": "fa8c0a9a-ba60-49d7-acf0-a41e54cc995c",
+      "name": "Wait",
+      "webhookId": "27f36994-15a0-48bd-a4d3-078a8a4ad633"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "form_trigger": {
+      "main": [
+        [
+          {
+            "node": "convert_product_image_to_base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download_image": {
+      "main": [
+        [
+          {
+            "node": "convert_ad_image_to_base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "convert_ad_image_to_base64": {
+      "main": [
+        [
+          {
+            "node": "build_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_image": {
+      "main": [
+        []
+      ]
+    },
+    "set_result": {
+      "main": [
+        [
+          {
+            "node": "get_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "convert_product_image_to_base64": {
+      "main": [
+        [
+          {
+            "node": "download_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate_ad_image_prompt": {
+      "main": [
+        [
+          {
+            "node": "generate_ad_image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate_ad_image": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build_prompt": {
+      "main": [
+        [
+          {
+            "node": "generate_ad_image_prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "set_result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "e9631f56-4fef-4396-b95d-ed381e413153",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4764540811cbb8d2e1efff249fe019f120efdfc1d1ad5d0e40382bf91ca0b3dc"
+  },
+  "id": "dVdQ40xm6xUuMToE",
+  "tags": []
+}
